@@ -40,8 +40,8 @@ LONG_PROMPT = (
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default="Qwen/Qwen2.5-0.5B-Instruct")
-    ap.add_argument("--budgets", type=int, nargs="+", default=[128, 256, 512])
-    ap.add_argument("--max-new-tokens", type=int, default=150)
+    ap.add_argument("--budgets", type=int, nargs="+", default=[48, 96, 160])
+    ap.add_argument("--max-new-tokens", type=int, default=200)
     ap.add_argument("--out", default=str(Path(__file__).resolve().parent.parent / "results" / "benchmark.csv"))
     args = ap.parse_args()
 
@@ -54,24 +54,46 @@ def main():
     # the "attention" scoring policy, which needs real attention weights back
     # from the forward pass (SDPA/flash kernels never return them).
     model = AutoModelForCausalLM.from_pretrained(
-        args.model, torch_dtype=dtype, attn_implementation="eager"
+        args.model, dtype=dtype, attn_implementation="eager"
     ).to(device)
     model.eval()
+
+    prompt_len = tokenizer(LONG_PROMPT, return_tensors="pt")["input_ids"].shape[1]
+    print(f"Prompt is {prompt_len} tokens; generating {args.max_new_tokens} more "
+          f"(total sequence ~{prompt_len + args.max_new_tokens} tokens).")
+    for b in args.budgets:
+        if b >= prompt_len + args.max_new_tokens:
+            print(f"  NOTE: budget {b} >= total sequence length, eviction will never trigger "
+                  f"for this budget (it will look identical to baseline). Use a tighter budget "
+                  f"to see the policies actually diverge.")
 
     results = run_comparison(
         model, tokenizer, LONG_PROMPT, budgets=args.budgets, max_new_tokens=args.max_new_tokens
     )
 
+    print()
     for r in results:
         print(
             f"{r.policy_name:28s} budget={str(r.budget):>6s} "
-            f"peak={r.peak_cache_mb:7.2f}MB  tok/s={r.tokens_per_sec:6.2f}  "
-            f"evicted={r.evicted_count:5d}  ppl={r.perplexity:.2f}"
+            f"peak={r.peak_cache_mb:7.3f}MB  tok/s={r.tokens_per_sec:6.2f}  "
+            f"evicted={r.evicted_count:5d}  ppl={r.perplexity:.3f}"
         )
 
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     results_to_csv(results, args.out)
-    print(f"\nWrote {args.out}")
+    print(f"\nWrote {args.out} (includes each policy's generated_text column for qualitative reading)")
+
+    # qualitative sanity check: print the tightest-budget attention vs FIFO
+    # output side by side, since the perplexity number alone is easy to
+    # misread — reading the actual text is what tells you WHY one policy wins
+    tightest = min(args.budgets)
+    by_name = {r.policy_name: r for r in results}
+    ctx = by_name.get(f"context_aware_budget{tightest}")
+    fifo = by_name.get(f"fifo_baseline_budget{tightest}")
+    if ctx and fifo:
+        print(f"\n=== Generated text at tightest budget ({tightest} tokens) ===")
+        print(f"[context-aware, ppl={ctx.perplexity:.2f}]:\n{ctx.generated_text[:400]}\n")
+        print(f"[FIFO baseline, ppl={fifo.perplexity:.2f}]:\n{fifo.generated_text[:400]}\n")
 
 
 if __name__ == "__main__":

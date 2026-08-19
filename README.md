@@ -81,7 +81,7 @@ bottleneck at moderate context lengths (4 to 8k tokens), not the weights.
 python scripts/run_demo.py --model Qwen/Qwen2.5-0.5B-Instruct --budget 256 --scoring attention
 
 # compare policies across several budgets, writes results/benchmark.csv
-python scripts/run_benchmark.py --model Qwen/Qwen2.5-0.5B-Instruct --budgets 128 256 512
+python scripts/run_benchmark.py --model Qwen/Qwen2.5-0.5B-Instruct
 
 # turn that CSV into the headline figure
 python scripts/plot.py
@@ -98,23 +98,32 @@ python -m pytest tests/ -v
 
 | policy_name               | scoring   | budget | prompt_len | generated_len | peak_cache_mb | tokens_per_sec     | evicted_count | perplexity         |
 |---------------------------|-----------|--------|------------|---------------|---------------|--------------------|---------------|--------------------|
-| baseline_no_eviction      | attention | 317    | 166        | 150           | 3.703125      | 13.531117619405682 | 0             | 2.8477261066436768 |
-| context_aware_budget128   | attention | 128    | 166        | 150           | 1.5           | 12.59460447644969  | 188           | 3.629343271255493  |
-| fifo_baseline_budget128   | recency   | 128    | 166        | 150           | 1.5           | 13.970944384880802 | 188           | 4.995035171508789  |
-| random_ablation_budget128 | random    | 128    | 166        | 150           | 1.5           | 11.86134655221215  | 188           | 2.841912269592285  |
-| context_aware_budget256   | attention | 256    | 166        | 150           | 3.0           | 11.908109784759104 | 60            | 2.8477261066436768 |
-| fifo_baseline_budget256   | recency   | 256    | 166        | 150           | 3.0           | 13.521132001328338 | 60            | 2.8477261066436768 |
-| random_ablation_budget256 | random    | 256    | 166        | 150           | 3.0           | 15.15630408439566  | 60            | 2.8477261066436768 |
-| context_aware_budget512   | attention | 512    | 166        | 150           | 3.703125      | 15.217926953266577 | 0             | 2.8477261066436768 |
-| fifo_baseline_budget512   | recency   | 512    | 166        | 150           | 3.703125      | 14.166893580917995 | 0             | 2.8477261066436768 |
-| random_ablation_budget512 | random    | 512    | 166        | 150           | 3.703125      | 14.321425647056374 | 0             | 2.8477261066436768 |
+| baseline_no_eviction      | recency   | 367    | 166        | 200           | 4.2890625     | 12.573347724117724 | 0             | 1.4474139213562012 |
+| context_aware_budget48    | attention | 48     | 166        | 200           | 0.5625        | 14.60488260936574  | 318           | 1.8406596183776855 |
+| fifo_baseline_budget48    | recency   | 48     | 166        | 200           | 0.5625        | 14.608127449430027 | 318           | 1.8209562301635742 |
+| random_ablation_budget48  | random    | 48     | 166        | 200           | 0.5625        | 14.48303896739512  | 318           | 1.8154197931289673 |
+| context_aware_budget96    | attention | 96     | 166        | 200           | 1.125         | 14.41047202081317  | 270           | 1.6906108856201172 |
+| fifo_baseline_budget96    | recency   | 96     | 166        | 200           | 1.125         | 14.427335067879612 | 270           | 1.7529499530792236 |
+| random_ablation_budget96  | random    | 96     | 166        | 200           | 1.125         | 14.711301412240433 | 270           | 1.6857616901397705 |
+| context_aware_budget160   | attention | 160    | 166        | 200           | 1.875         | 14.261629144610014 | 206           | 1.5383222103118896 |
+| fifo_baseline_budget160   | recency   | 160    | 166        | 200           | 1.875         | 14.188338502474522 | 206           | 1.441357970237732  |
+| random_ablation_budget160 | random    | 160    | 166        | 200           | 1.875         | 14.749039125922554 | 206           | 1.5567373037338257 |
 
-### Findings
-At the two larger budgets (3.0 MB and 3.7 MB), all three policies sit right on that dashed line. The budget wasn't tight enough to force much eviction yet, so all four setups behave almost identically.
+## Findings
+Initial results (single prompt, Qwen2.5-0.5B, budgets of 48/96/160 tokens)
+did not show a clean win for attention-based eviction over the FIFO
+baseline. FIFO matched the no-eviction baseline most closely at the
+loosest budget, and random eviction tracked the attention-based policy
+closely at every budget tested.
 
-Also, another interesting point is the tightest budget (1.5 MB). There, FIFO is clearly worst (perplexity near 5.0), your context-aware policy is noticeably better (3.6), and random ties with the unconstrained baseline (2.8).
-
-**Issue**: That last result of random eviction matching the no-limit baseline, is a bad result. Randomly deleting most of the context should not produce output as coherent as keeping everything. If anything it should be the worst of the three eviction policies, not the best.
+Investigating why turned up a likely comparison bug rather than a real
+result: `recency_window` is a fixed constant (32 tokens) for the
+attention and random policies, but for the FIFO policy the entire budget
+acts as a sliding recency window. FIFO therefore keeps far more recent
+context than the other two policies at the same memory budget, which
+likely explains its advantage at looser budgets. The cumulative attention
+score is also unnormalized by token age, so it may be partly acting as a
+proxy for "has existed longer" rather than "is currently relevant."
 
 
 ## Notes

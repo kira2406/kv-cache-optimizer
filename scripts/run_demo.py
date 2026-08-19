@@ -45,7 +45,7 @@ def main():
     # weights, so output_attentions=True would silently return None.
     attn_impl = "eager" if args.scoring == "attention" else "sdpa"
     model = AutoModelForCausalLM.from_pretrained(
-        args.model, torch_dtype=dtype, attn_implementation=attn_impl
+        args.model, dtype=dtype, attn_implementation=attn_impl
     ).to(device)
     model.eval()
 
