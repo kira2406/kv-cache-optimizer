@@ -1,0 +1,66 @@
+policy_name,scoring,budget,prompt_len,generated_len,peak_cache_mb,tokens_per_sec,evicted_count,perplexity,generated_text
+baseline_no_eviction,recency,367,166,200,4.2890625,12.573347724117724,0,1.4474139213562012,"### Initial Recovery
+When a node fails, the coordinator node forwards a request to the shard leader to recover the node. The shard leader then forwards the request to the replica responsible for the key range. The replica then forwards the request to the replica responsible for the value range. The replica then forwards the request to the replica responsible for the metadata range. The replica then forwards the request to the replica responsible for the metadata control plane. The replica then forwards the request to the replica responsible for the metadata control plane. The replica then forwards the request to the replica responsible for the metadata control plane. The replica then forwards the request to the replica responsible for the metadata control plane. The replica then forwards the request to the replica responsible for the metadata control plane. The replica then forwards the request to the replica responsible for the metadata control plane. The replica then forwards the request to the replica responsible for the metadata control plane. The replica then forwards the request to the replica responsible for the metadata control plane. The replica"
+context_aware_budget48,attention,48,166,200,0.5625,14.60488260936574,318,1.8406596183776855,"### Initial Recovery
+In the initial recovery phase, the control plane is responsible for detecting and resolving any failures in the control plane. This phase involves the following steps:
+
+1. The control plane sends a heartbeat message to each shard, indicating its health status.
+2. The shard receives the heartbeat message and checks its own health status.
+3. If the shard is healthy, it sends a message to the leader node, which then sends a message to the coordinator node, which then sends a message to the Raft client. The Raft client then sends a message to the leader node, which then sends a message to the coordinator node, which then sends a message to the master node. The master node then sends a message to the database server, which then sends a message to the database server. The database server then sends a message to the database server, which then sends a message to the database server. The database server then sends a message to the database server, which then sends a message to the"
+fifo_baseline_budget48,recency,48,166,200,0.5625,14.608127449430027,318,1.8209562301635742,"### Data Loss
+Data loss is a common problem in distributed systems, especially in the presence of multiple replicas. In the case of a data loss, the system must be able to recover from the loss and continue to function. This can be achieved through various techniques, such as:
+
+1. Data recovery: This involves restoring the data that was lost or corrupted. This can be done using various methods, such as using a data recovery tool or a professional data recovery service.
+
+2. Data backup: This involves creating a backup of the data that was lost or corrupted. This can be done using various methods, such as using a cloud storage service or a data backup service.
+
+3. Data recovery: This involves finding and restoring the data that was lost or corrupted. This can be done using various methods, such as using a data recovery tool or a data recovery service.
+
+4. Data migration: This involves moving the data from one system to another. This can be done using various methods, such as using"
+random_ablation_budget48,random,48,166,200,0.5625,14.48303896739512,318,1.8154197931289673,"### Initial Recovery
+1. **Data Recovery**: The control plane is responsible for recovering data from the failed node. This involves reading the data from the failed node and restoring it to the control plane.
+2. **Data Integrity**: The control plane ensures that the data read from the failed node is accurate and complete. This is done by verifying the data against the expected format and content.
+3. **Data Consistency**: The data read from the failed node is consistent with the data read from other nodes in the network. This ensures that the network remains stable and reliable.
+4. Data Security: The data read from the failed node is encrypted and stored securely, preventing unauthorized access and data breaches.
+5. Data Integrity: The data read from the failed node is verified and confirmed to be accurate and up-to-date, ensuring the integrity of the data.
+
+By implementing these measures, we can ensure that the data is not only protected but also verified and confirmed, thereby enhancing the security and reliability of the data"
+context_aware_budget96,attention,96,166,200,1.125,14.41047202081317,270,1.6906108856201172,"### Initial Recovery
+When a shard fails, the coordinator forwards a message to the shard leader, which then forwards it to the shard replica. The replica then forwards the message to the shard coordinator, which then forwards it to the shard leader. The shard leader then forwards the message to the shard replica, which then forwards the message to the shard coordinator. The coordinator then forwards the message to the coordinator, which then forwards the message to the shard leader. The shard leader then forwards the message to the shard replica, which then forwards the message to the shard coordinator, which then forwards the message to the coordinator. The coordinator then forwards the message to the shard leader, which then forwards the message to the shard replica, which then forwards the message to the shard leader, and so on. The leader then forwards the message to the coordinator, which then forwards it to the coordinator, and so on, until the coordinator receives the message.
+
+## Failure Recovery
+### Initial Recovery
+When a shard leader fails, the"
+fifo_baseline_budget96,recency,96,166,200,1.125,14.427335067879612,270,1.7529499530792236,"### Initial Recovery
+When a node fails, the control plane is notified and the node is restarted. The control plane is responsible for restoring the node's state to a consistent state, including restoring the log-structured merge tree and metadata. The control plane also handles the recovery of data from the failed node's disk.
+
+### Periodic Recovery
+The control plane is periodically notified of node failures and the recovery process is repeated. This ensures that the system remains consistent and reliable even when nodes fail.
+
+### Fault Tolerance
+The system is designed to be fault-tolerant, meaning that if one node fails, the system can still function properly. This is achieved through the use of redundant components and the use of failover mechanisms.
+
+### Scalability
+The system is designed to be scalable, meaning that it can be easily expanded to handle increased loads. This is achieved through the use of scalable components and the use of load balancing mechanisms.
+
+### Security
+The system is designed to be secure, meaning that it"
+random_ablation_budget96,random,96,166,200,1.125,14.711301412240433,270,1.6857616901397705,"### Initial Recovery
+1. **Initial Recovery**: When a node fails, the coordinator node is notified. The coordinator node then initiates a recovery process to restore the node to a consistent state. This involves:
+   - **Node Identification**: The coordinator node identifies the node that failed.
+   - **Node Identification**: The coordinator node identifies the node that failed.
+   - **Node Identification**: The coordinator node identifies the node that failed.
+   - **Node Identification**: The coordinator node identifies the node that failed.
+   - **Node Identification**: The coordinator node identifies the node that failed.
+   - **Node Identification**: The coordinator node identifies the node that failed.
+   - **Node Identification**: The coordinator node identifies the node that failed.
+   - **Node Identification**: The coordinator node identifies the node that failed.
+   - **Node Identification**: The coordinator node identifies the node that failed.
+   - **Node Identification**: The coordinator node identifies the node that failed.
+   - **Node Identification**: The coordinator"
+context_aware_budget160,attention,160,166,200,1.875,14.261629144610014,206,1.5383222103118896,"### Initial Recovery
+When a node fails, the coordinator node forwards a request to the shard leader to recover the node. The shard leader then forwards the request to the replica responsible for the key range. The replica then forwards the request to the replica responsible for the value range. The replica then forwards the request to the replica responsible for the key range. The replica then forwards the request to the replica responsible for the value range. The replica then forwards the request to the replica responsible for the key range. The replica then forwards the request to the replica responsible for the value range. The replica then forwards the request to the replica responsible for the value range. The replica then forwards the request to the replica responsible for the value range. The replica then forwards the request to the replica responsible for the value range. The replica then forwards the request to the replica responsible for the value range. The replica then forwards the request to the replica responsible for the value range. The replica then forwards the request to the replica responsible"
+fifo_baseline_budget160,recency,160,166,200,1.875,14.188338502474522,206,1.441357970237732,"### Initial Recovery
+When a shard fails, the coordinator node forwards a request to the shard leader to recover the shard. The shard leader then forwards the request to the shard replica responsible for the relevant key range. The replica then forwards the request to the in-sync replica responsible for the key range. The in-sync replica then forwards the request to the in-sync replica responsible for the key range. The in-sync replica then forwards the request to the in-sync replica responsible for the key range. The in-sync replica then forwards the request to the in-sync replica responsible for the key range. The in-sync replica then forwards the request to the in-sync replica responsible for the key range. The in-sync replica then forwards the request to the in-sync replica responsible for the key range. The in-sync replica then forwards the request to the in-sync replica responsible for the key range. The in-sync replica then forwards the request to the in-sync replica responsible for the key range. The in-sync replica then forwards the request"
+random_ablation_budget160,random,160,166,200,1.875,14.749039125922554,206,1.5567373037338257,"### Initial Recovery
+When a node fails, the coordinator node is notified and the node is marked as ""down"". The coordinator node then attempts to recover the node by sending a ""recovery request"" to the node. The node responds with a ""recovery response"" indicating whether it is in-sync with the coordinator node and whether it has recovered from the failure. If the node is not in-sync with the coordinator node, the coordinator node sends a ""recovery request"" to the node to attempt to recover the node. If the node is not in-sync with the coordinator node, the coordinator node sends a ""recovery request"" to the node to attempt to recover the node. If the node is not in-sync with the coordinator node, the coordinator node sends a ""recovery request"" to the node to attempt to recover the node. If the node is not in-sync with the coordinator node, the coordinator node sends a ""recovery request"" to the node to attempt to recover the node"
