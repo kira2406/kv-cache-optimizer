@@ -1,11 +1,25 @@
 """
 Runs the full policy comparison (baseline + attention/recency/random at
-several budgets) and writes results/benchmark.csv, which scripts/plot.py
-turns into the memory-vs-quality tradeoff figure for the README.
+several budgets) across a diverse set of prompts (see
+kv_cache_optimizer.prompts.PROMPTS), and writes:
+
+  results/benchmark_raw.csv      one row per (prompt, policy, budget),
+                                  includes each policy's generated_text
+  results/benchmark_summary.csv  one row per (policy, budget), aggregated
+                                  across prompts: mean/std perplexity,
+                                  mean throughput/memory, and a paired
+                                  win-count vs. the FIFO baseline
+
+scripts/plot.py reads the summary CSV to draw the memory-vs-quality
+tradeoff figure for the README, with error bars from the per-prompt std.
 
 Example:
     python scripts/run_benchmark.py --model Qwen/Qwen2.5-0.5B-Instruct \
         --budgets 128 256 512 --max-new-tokens 150
+
+Use --single-prompt to run the old one-prompt-only mode (faster, useful
+for a quick smoke test while iterating on the cache manager itself; not
+what should end up in the README).
 """
 
 import argparse
@@ -16,25 +30,14 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
-from kv_cache_optimizer.eval_harness import run_comparison, results_to_csv
-
-LONG_PROMPT = (
-    "You are a helpful assistant with expert knowledge of distributed systems. "
-    "Below is a long design document. Read it carefully, then continue it with "
-    "a detailed section on failure recovery.\n\n"
-    "## System Overview\n"
-    "The system is a distributed key-value store partitioned across N shards, "
-    "each replicated three ways using a Raft-based consensus protocol. Clients "
-    "write through a coordinator node, which forwards requests to the shard "
-    "leader responsible for the relevant key range. Reads may be served by any "
-    "in-sync replica depending on the requested consistency level.\n\n"
-    "## Data Model\n"
-    "Keys are arbitrary byte strings up to 1KB; values up to 1MB. Each shard "
-    "maintains a sorted log-structured merge tree on local disk, with periodic "
-    "compaction to bound read amplification. Metadata about shard ownership is "
-    "stored in a separate strongly-consistent control plane.\n\n"
-    "## Failure Recovery\n"
+from kv_cache_optimizer.eval_harness import (
+    run_comparison,
+    run_multi_prompt_comparison,
+    results_to_csv,
+    summarize_results,
+    summary_to_csv,
 )
+from kv_cache_optimizer.prompts import PROMPTS
 
 
 def main():
@@ -42,7 +45,9 @@ def main():
     ap.add_argument("--model", default="Qwen/Qwen2.5-0.5B-Instruct")
     ap.add_argument("--budgets", type=int, nargs="+", default=[48, 96, 160])
     ap.add_argument("--max-new-tokens", type=int, default=200)
-    ap.add_argument("--out", default=str(Path(__file__).resolve().parent.parent / "results" / "benchmark.csv"))
+    ap.add_argument("--single-prompt", action="store_true",
+                     help="Run only the original distributed-systems prompt, for a quick smoke test.")
+    ap.add_argument("--out-dir", default=str(Path(__file__).resolve().parent.parent / "results"))
     args = ap.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -58,42 +63,61 @@ def main():
     ).to(device)
     model.eval()
 
-    prompt_len = tokenizer(LONG_PROMPT, return_tensors="pt")["input_ids"].shape[1]
-    print(f"Prompt is {prompt_len} tokens; generating {args.max_new_tokens} more "
-          f"(total sequence ~{prompt_len + args.max_new_tokens} tokens).")
-    for b in args.budgets:
-        if b >= prompt_len + args.max_new_tokens:
-            print(f"  NOTE: budget {b} >= total sequence length, eviction will never trigger "
-                  f"for this budget (it will look identical to baseline). Use a tighter budget "
-                  f"to see the policies actually diverge.")
+    for prompt_id, category, text in ([PROMPTS[0]] if args.single_prompt else PROMPTS):
+        prompt_len = tokenizer(text, return_tensors="pt")["input_ids"].shape[1]
+        for b in args.budgets:
+            if b >= prompt_len + args.max_new_tokens:
+                print(f"  NOTE: prompt '{prompt_id}' budget {b} >= total sequence length "
+                      f"({prompt_len + args.max_new_tokens}), eviction will never trigger for "
+                      f"this (prompt, budget) pair.")
 
-    results = run_comparison(
-        model, tokenizer, LONG_PROMPT, budgets=args.budgets, max_new_tokens=args.max_new_tokens
-    )
-
-    print()
-    for r in results:
-        print(
-            f"{r.policy_name:28s} budget={str(r.budget):>6s} "
-            f"peak={r.peak_cache_mb:7.3f}MB  tok/s={r.tokens_per_sec:6.2f}  "
-            f"evicted={r.evicted_count:5d}  ppl={r.perplexity:.3f}"
+    if args.single_prompt:
+        results = run_comparison(
+            model, tokenizer, PROMPTS[0][2], budgets=args.budgets,
+            max_new_tokens=args.max_new_tokens, prompt_id=PROMPTS[0][0],
+        )
+    else:
+        print(f"\nRunning {len(PROMPTS)} prompts x {len(args.budgets)} budgets x 3 policies "
+              f"+ {len(PROMPTS)} baselines ...")
+        results = run_multi_prompt_comparison(
+            model, tokenizer, PROMPTS, budgets=args.budgets, max_new_tokens=args.max_new_tokens,
         )
 
-    Path(args.out).parent.mkdir(parents=True, exist_ok=True)
-    results_to_csv(results, args.out)
-    print(f"\nWrote {args.out} (includes each policy's generated_text column for qualitative reading)")
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
-    # qualitative sanity check: print the tightest-budget attention vs FIFO
-    # output side by side, since the perplexity number alone is easy to
-    # misread — reading the actual text is what tells you WHY one policy wins
-    tightest = min(args.budgets)
-    by_name = {r.policy_name: r for r in results}
-    ctx = by_name.get(f"context_aware_budget{tightest}")
-    fifo = by_name.get(f"fifo_baseline_budget{tightest}")
-    if ctx and fifo:
-        print(f"\n=== Generated text at tightest budget ({tightest} tokens) ===")
-        print(f"[context-aware, ppl={ctx.perplexity:.2f}]:\n{ctx.generated_text[:400]}\n")
-        print(f"[FIFO baseline, ppl={fifo.perplexity:.2f}]:\n{fifo.generated_text[:400]}\n")
+    raw_path = out_dir / ("benchmark_raw.csv" if not args.single_prompt else "benchmark.csv")
+    results_to_csv(results, str(raw_path))
+    print(f"\nWrote {raw_path} ({len(results)} rows, includes generated_text for qualitative reading)")
+
+    if not args.single_prompt:
+        summary = summarize_results(results)
+        summary_path = out_dir / "benchmark_summary.csv"
+        summary_to_csv(summary, str(summary_path))
+        print(f"Wrote {summary_path}\n")
+
+        print(f"{'policy':16s} {'budget':>6s} {'n':>3s}  {'ppl (mean±std)':>18s}  "
+              f"{'tok/s':>6s}  {'peak MB':>8s}  {'wins vs FIFO':>13s}")
+        for s in summary:
+            print(
+                f"{s.scoring:16s} {str(s.budget):>6s} {s.n_prompts:>3d}  "
+                f"{s.perplexity_mean:7.3f} \u00b1 {s.perplexity_std:6.3f}  "
+                f"{s.tokens_per_sec_mean:6.2f}  {s.peak_cache_mb_mean:8.3f}  "
+                f"{s.wins_vs_fifo or '-':>13s}"
+            )
+        print(
+            "\n'wins vs FIFO' = how many prompts this policy scored a LOWER "
+            "(better) perplexity than the FIFO baseline at the same budget. "
+            "Check this alongside the mean: a policy can win on average while "
+            "losing on most individual prompts if one prompt swings the mean."
+        )
+    else:
+        for r in results:
+            print(
+                f"{r.policy_name:28s} budget={str(r.budget):>6s} "
+                f"peak={r.peak_cache_mb:7.3f}MB  tok/s={r.tokens_per_sec:6.2f}  "
+                f"evicted={r.evicted_count:5d}  ppl={r.perplexity:.3f}"
+            )
 
 
 if __name__ == "__main__":
