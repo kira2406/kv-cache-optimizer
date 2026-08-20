@@ -143,6 +143,7 @@ def run_comparison(
     budgets: List[int],
     max_new_tokens: int = 128,
     prompt_id: str = "default",
+    recency_window: int = 32,
 ) -> List[BenchmarkResult]:
     """
     Runs: an unbounded baseline, plus attention/recency/random policies at
@@ -173,6 +174,7 @@ def run_comparison(
                     budget=budget,
                     max_new_tokens=max_new_tokens,
                     prompt_id=prompt_id,
+                    recency_window=recency_window,
                 )
             )
     return results
@@ -184,6 +186,7 @@ def run_multi_prompt_comparison(
     prompts: List[Tuple[str, str, str]],
     budgets: List[int],
     max_new_tokens: int = 128,
+    recency_window: int = 32,
 ) -> List[BenchmarkResult]:
     """
     Runs run_comparison independently for every (prompt_id, category, text)
@@ -202,6 +205,7 @@ def run_multi_prompt_comparison(
             run_comparison(
                 model, tokenizer, text, budgets=budgets,
                 max_new_tokens=max_new_tokens, prompt_id=prompt_id,
+                recency_window=recency_window,
             )
         )
     return all_results

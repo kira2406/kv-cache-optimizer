@@ -45,6 +45,12 @@ def main():
     ap.add_argument("--model", default="Qwen/Qwen2.5-0.5B-Instruct")
     ap.add_argument("--budgets", type=int, nargs="+", default=[48, 96, 160])
     ap.add_argument("--max-new-tokens", type=int, default=200)
+    ap.add_argument("--recency-window", type=int, default=32,
+                     help="Guaranteed most-recent tokens exempt from scoring, applied EQUALLY "
+                          "to all three policies (attention, recency/FIFO, random). Set to 0 for "
+                          "the strictest fair test: no policy gets a free 'always keep recent N' "
+                          "floor, every policy earns its whole non-protected budget on its own "
+                          "criterion. Default 32 matches the original setup.")
     ap.add_argument("--single-prompt", action="store_true",
                      help="Run only the original distributed-systems prompt, for a quick smoke test.")
     ap.add_argument("--out-dir", default=str(Path(__file__).resolve().parent.parent / "results"))
@@ -75,12 +81,14 @@ def main():
         results = run_comparison(
             model, tokenizer, PROMPTS[0][2], budgets=args.budgets,
             max_new_tokens=args.max_new_tokens, prompt_id=PROMPTS[0][0],
+            recency_window=args.recency_window,
         )
     else:
         print(f"\nRunning {len(PROMPTS)} prompts x {len(args.budgets)} budgets x 3 policies "
-              f"+ {len(PROMPTS)} baselines ...")
+              f"+ {len(PROMPTS)} baselines (recency_window={args.recency_window}) ...")
         results = run_multi_prompt_comparison(
             model, tokenizer, PROMPTS, budgets=args.budgets, max_new_tokens=args.max_new_tokens,
+            recency_window=args.recency_window,
         )
 
     out_dir = Path(args.out_dir)

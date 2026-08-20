@@ -117,19 +117,27 @@ class KVCacheManager:
         return cache_len > self.config.budget
 
     def compute_keep_indices(self, cache_len: int) -> torch.Tensor:
-        """Sorted 1-D LongTensor of indices (into the current cache) to retain."""
+        """Sorted 1-D LongTensor of indices (into the current cache) to retain.
+
+        All three policies now share ONE structure, so recency_window is a
+        fair, equal knob rather than something only attention/random pay:
+
+            always_keep = protected_prefix ∪ most-recent(recency_window)
+            remaining_budget = budget - len(always_keep)
+            keep += top `remaining_budget` candidates by policy criterion
+
+        This matters because capping recency_window alone does NOT change
+        FIFO's behavior if FIFO's remaining-budget criterion is ALSO
+        recency: ranking leftover candidates by recency just re-derives the
+        same next-most-recent block, so "protected + windowed recency, rest
+        by recency" collapses back to "protected + everything by recency"
+        for any budget. The scoring is what has to differ, not the window.
+        A recency_window of 0 is the strictest fair test: nobody gets a
+        free "always keep the last N" floor, and every policy has to earn
+        its entire non-protected budget on its own criterion alone.
+        """
         cfg = self.config
         protected = set(range(min(cfg.protected_prefix_len, cache_len)))
-
-        if cfg.scoring == "recency":
-            # Proper sliding-window / FIFO baseline: protected prefix plus as
-            # many of the most recent tokens as fit in the remaining budget.
-            # (recency_window is not used as a separate exemption here — the
-            # whole non-protected budget IS the recency window.)
-            n_recent = max(cfg.budget - len(protected), 0)
-            recent_start = max(cache_len - n_recent, len(protected))
-            keep = protected | set(range(recent_start, cache_len))
-            return torch.tensor(sorted(keep), dtype=torch.long, device=self.device)
 
         recent_start = max(cache_len - cfg.recency_window, cfg.protected_prefix_len)
         recent = set(range(recent_start, cache_len))
@@ -143,6 +151,14 @@ class KVCacheManager:
         elif cfg.scoring == "random":
             perm = torch.randperm(len(candidates))[:remaining_budget]
             keep = always_keep | {candidates[i] for i in perm.tolist()}
+        elif cfg.scoring == "recency":
+            # FIFO/sliding-window baseline: rank leftover candidates by
+            # recency too (nearest first). At recency_window=0 this makes
+            # FIFO earn its budget the "same way" attention does structurally
+            # (compete for remaining_budget slots), even though its ranking
+            # criterion is still recency by definition.
+            k = min(remaining_budget, len(candidates))
+            keep = always_keep | set(sorted(candidates)[-k:]) if k > 0 else always_keep
         else:  # "attention"
             cand_scores = self.scores[candidates]
             k = min(remaining_budget, len(candidates))
